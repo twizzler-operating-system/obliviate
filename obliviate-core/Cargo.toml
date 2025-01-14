@@ -29,7 +29,7 @@ itertools = "0.12.1"
 libc = "0.2.153"
 lru = "0.12.3"
 lru-mem = { path = "../crates/lru-mem" }
-fatfs = { git = "https://github.com/zphrs/rust-fatfs.git", branch = "zphrs-rwproxy", version = "0.4.0", features = [
+fatfs = { git = "https://github.com/twizzler-operating-system/rust-fatfs.git", branch = "zphrs-rwproxy", version = "0.4.0", features = [
     "std",
     "log_level_info",
     "lfn",
