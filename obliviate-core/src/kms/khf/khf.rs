@@ -748,13 +748,13 @@ where
         Ok(self.ranged_derive_inner(start_key_id, end_key_id).collect())
     }
 
-    fn derive_mut<IO>(
+    fn derive_mut<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
         key_id: Self::KeyId,
     ) -> Result<Key<N>, Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>,
     {
         wal.append(StableLogEntry::Update {
@@ -764,7 +764,7 @@ where
         Ok(self.derive_mut_inner(key_id))
     }
 
-    fn ranged_derive_mut<IO>(
+    fn ranged_derive_mut<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
         start_key_id: Self::KeyId,
@@ -772,7 +772,7 @@ where
         _spec_bounds: Option<(Self::KeyId, Self::KeyId)>,
     ) -> Result<Vec<(Self::KeyId, Key<N>)>, Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>,
     {
         wal.append(StableLogEntry::UpdateRange {
@@ -783,13 +783,13 @@ where
         Ok(self.ranged_derive_inner(start_key_id, end_key_id).collect())
     }
 
-    fn delete<IO>(
+    fn delete<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
         key_id: Self::KeyId,
     ) -> Result<(), Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>,
     {
         if self.delete_key_inner(key_id) {
@@ -811,12 +811,12 @@ where
         Ok(())
     }
 
-    fn update<IO>(
+    fn update<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
     ) -> Result<Vec<(Self::KeyId, Key<N>)>, Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>,
     {
         let mut updated_keys = HashSet::new();
@@ -863,14 +863,14 @@ where
     C: StatefulCrypter + Default,
     H: Hasher<N>,
 {
-    fn persist<IO>(
+    fn persist<'a, IO>(
         &mut self,
         root_key: Key<N>,
         path: &str,
         fs: &FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>,
     ) -> Result<(), Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>,
     {
         let ser = bincode::serialize(self)?;
@@ -898,14 +898,14 @@ where
         // Ok(())
     }
 
-    fn load<IO>(
+    fn load<'a, IO>(
         root_key: Key<N>,
         path: &str,
         fs: &FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>,
     ) -> Result<Self, Self::Error>
     where
         Self: Sized,
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>,
     {
         let mut ser = vec![];

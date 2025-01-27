@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["obliviate-core", "object-store"]
-exclude = ["object-store"]
+members = ["obliviate-core"]
 
 [profile.release]
 debug = true

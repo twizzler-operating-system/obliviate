@@ -64,7 +64,7 @@ unsafe impl<'a, IO, T, G, C, const N: usize> Sync for SecureWAL<'a, IO, T, G, C,
 
 impl<'a, IO, T, G, C, const N: usize> SecureWAL<'a, IO, T, G, C, N>
 where
-    IO: ReadWriteSeek + 'static + IoBase,
+    IO: ReadWriteSeek + 'a + IoBase,
     std::io::Error: From<fatfs::Error<IO::Error>>,
 {
     /// Opens a new WAL.

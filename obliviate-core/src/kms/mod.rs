@@ -37,28 +37,28 @@ pub trait PersistableKeyManagementScheme<const N: usize>: KeyManagementScheme {
     /// root key. The KMS is responsible for setting up its own on-disk
     /// structure using the given path as the root. This function aligns the
     /// on-disk state of the KMS to match its in-memory state.
-    fn persist<IO>(
+    fn persist<'a, IO>(
         &mut self,
         root_key: Key<N>,
         path: &str,
         fs: &FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>,
     ) -> Result<(), Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>;
 
     /// Loads a persisted KMS from the given path, decrypting it using the
     /// supplied root key. This function aligns the in-memory state of the KMS
     /// to match its on-disk state. This function should return a new instance
     /// of the KMS if the supplied path doesn't exist.
-    fn load<IO>(
+    fn load<'a, IO>(
         root_key: Key<N>,
         path: &str,
         fs: &FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>,
     ) -> Result<Self, Self::Error>
     where
         Self: Sized,
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>;
 
     /// Sets the working directory of the KMS to the specified directory.
@@ -135,20 +135,20 @@ pub trait StableKeyManagementScheme<G, C, const N: usize>:
     /// key is not yet covered. A handle to an in-memory WAL is given for the
     /// KMS to log that the key ID was updated, as well as any changes to its
     /// internal state.
-    fn derive_mut<IO>(
+    fn derive_mut<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
         key_id: Self::KeyId,
     ) -> Result<Key<N>, Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>;
 
     /// Derives a range of keys, marking each as updated. A handle to an
     /// in-memory WAL is given for the KMS to log that each key ID was updated,
     /// as well as any changes to its internal state. Any key updates that have
     /// been speculated on are not logged.
-    fn ranged_derive_mut<IO>(
+    fn ranged_derive_mut<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
         start_key_id: Self::KeyId,
@@ -156,30 +156,30 @@ pub trait StableKeyManagementScheme<G, C, const N: usize>:
         spec_bounds: Option<(Self::KeyId, Self::KeyId)>,
     ) -> Result<Vec<(Self::KeyId, Key<N>)>, Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>;
 
     /// Deletes the key with the given key ID. A handle to an in-memory WAL is
     /// given for the KMS to record this change.
-    fn delete<IO>(
+    fn delete<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
         key_id: Self::KeyId,
     ) -> Result<(), Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>;
 
     /// Updates the internal state of the KMS to provide new keys for each
     /// updated block recorded in the in-memory WAL. The KMS returns a list of
     /// (key ID, key) tuples. Each tuple indicates the key ID that was updated
     /// and the old value of the key it mapped to.
-    fn update<IO>(
+    fn update<'a, IO>(
         &mut self,
         wal: &SecureWAL<IO, Self::LogEntry, G, C, N>,
     ) -> Result<Vec<(Self::KeyId, Key<N>)>, Self::Error>
     where
-        IO: ReadWriteSeek + 'static,
+        IO: ReadWriteSeek + 'a,
         std::io::Error: From<fatfs::Error<<IO as IoBase>::Error>>;
 }
 

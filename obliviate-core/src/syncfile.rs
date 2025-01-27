@@ -26,7 +26,7 @@ pub struct File<'a, IO: fatfs::ReadWriteSeek + 'a>(StdFile<'a, IO, Tp, Occ>);
 
 impl<'a, IO> File<'a, IO>
 where
-    IO: fatfs::ReadWriteSeek + 'static,
+    IO: fatfs::ReadWriteSeek + 'a,
 {
     pub fn create<'b>(fs: &'b mut fatfs::FileSystem<IO, Tp, Occ>, path: &str) -> FsResult<Self, IO>
     where
