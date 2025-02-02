@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
     mem,
     ops::DerefMut,
-    sync::{Mutex, RwLock, RwLockReadGuard},
+    sync::{Arc, Mutex, RwLock, RwLockReadGuard},
 };
 
 use crc::{Crc, CRC_64_XZ};
@@ -35,7 +35,7 @@ pub enum SecureWALError<G, C, Io> {
     Fatfs(#[from] fatfs::Error<Io>),
 }
 
-pub struct SecureWAL<'a, IO: ReadWriteSeek, T, G, C, const N: usize> {
+pub struct SecureWAL<IO: ReadWriteSeek, T, G, C, const N: usize> {
     /// The path to the WAL.
     path: String,
     /// The core state of the WAL.
@@ -45,7 +45,7 @@ pub struct SecureWAL<'a, IO: ReadWriteSeek, T, G, C, const N: usize> {
     /// Provides checksums for persisted WAL entries.
     crc: Crc<u64>,
     /// the filesystem to write into
-    fs: &'a Mutex<FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>>,
+    fs: Arc<Mutex<FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>>>,
 }
 
 struct State<T, G, const N: usize> {
@@ -57,12 +57,12 @@ struct State<T, G, const N: usize> {
     ivg: G,
 }
 
-unsafe impl<'a, IO, T, G, C, const N: usize> Sync for SecureWAL<'a, IO, T, G, C, N> where
+unsafe impl<'a, IO, T, G, C, const N: usize> Sync for SecureWAL<IO, T, G, C, N> where
     IO: ReadWriteSeek
 {
 }
 
-impl<'a, IO, T, G, C, const N: usize> SecureWAL<'a, IO, T, G, C, N>
+impl<'a, IO, T, G, C, const N: usize> SecureWAL<IO, T, G, C, N>
 where
     IO: ReadWriteSeek + 'a + IoBase,
     std::io::Error: From<fatfs::Error<IO::Error>>,
@@ -71,13 +71,12 @@ where
     pub fn open(
         path: String,
         key: Key<N>,
-        fs: &'a Mutex<FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>>,
+        fs: Arc<Mutex<FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>>>,
     ) -> Result<Self, SecureWALError<G::Error, C::Error, IO::Error>>
     where
         for<'de> T: Deserialize<'de>,
         G: Ivg + Default,
         C: StatefulCrypter + Default,
-        IO: ReadWriteSeek + IoBase,
     {
         let state = State {
             entries: Vec::new(),
@@ -273,13 +272,14 @@ where
     }
 
     /// Returns an iterator over the persisted entries of the WAL.
-    pub fn iter_persisted(
-        &self,
+    pub fn iter_persisted<'b>(
+        &'a self,
         key: Key<N>,
-        fs: &'a mut FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>,
+        fs: &'b mut FileSystem<IO, DefaultTimeProvider, LossyOemCpConverter>,
     ) -> Result<IterPersisted<IO, T, G, C, N>, io::Error>
     where
         T: for<'de> Deserialize<'de>,
+        'b: 'a,
     {
         Ok(IterPersisted {
             _guard: self.state.read().unwrap(),
@@ -292,7 +292,7 @@ where
     }
 }
 
-impl<'a, IO, T, G, C, const N: usize> IntoIterator for &'a SecureWAL<'a, IO, T, G, C, N>
+impl<'a, IO, T, G, C, const N: usize> IntoIterator for &'a SecureWAL<IO, T, G, C, N>
 where
     T: Clone,
     IO: ReadWriteSeek + 'static,
@@ -375,93 +375,3 @@ where
         bincode::deserialize(&ser).ok()
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use std::{collections::HashSet, fs, sync::Arc, thread};
-
-//     use crate::crypter::{aes::Aes256Ctr, ivs::SequentialIvg};
-
-//     use super::*;
-
-//     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
-//     struct LogEntry {
-//         id: usize,
-//     }
-
-//     const NUM_THREADS: usize = 128;
-//     const KEY_SIZE: usize = 32;
-
-//     #[test]
-//     fn it_works() {
-//         let wal = Arc::new(
-//             SecureWAL::<LogEntry, SequentialIvg, Aes256Ctr, KEY_SIZE>::open(
-//                 "/tmp/kms_test_secure_wal_it_works.log",
-//                 [0; KEY_SIZE],
-//             )
-//             .unwrap(),
-//         );
-
-//         let handles: Vec<_> = (0..NUM_THREADS)
-//             .map(|n| {
-//                 thread::spawn({
-//                     let wal = wal.clone();
-//                     move || {
-//                         wal.append(LogEntry { id: n });
-//                     }
-//                 })
-//             })
-//             .collect();
-
-//         for handle in handles {
-//             handle.join().unwrap();
-//         }
-
-//         let ids: HashSet<_> = HashSet::from_iter(wal.iter().map(|entry| entry.id));
-//         assert_eq!(ids.len(), NUM_THREADS);
-//     }
-
-//     #[test]
-//     fn reload() {
-//         let _ = fs::remove_file("/tmp/kms_test_secure_wal_reload.log");
-
-//         let key = [0; KEY_SIZE];
-
-//         let wal = Arc::new(
-//             SecureWAL::<LogEntry, SequentialIvg, Aes256Ctr, KEY_SIZE>::open(
-//                 "/tmp/kms_test_secure_wal_reload.log",
-//                 key,
-//             )
-//             .unwrap(),
-//         );
-
-//         let handles: Vec<_> = (0..4)
-//             .map(|n| {
-//                 thread::spawn({
-//                     let wal = wal.clone();
-//                     move || {
-//                         wal.append(LogEntry { id: n });
-//                     }
-//                 })
-//             })
-//             .collect();
-
-//         for handle in handles {
-//             handle.join().unwrap();
-//         }
-
-//         wal.persist(key).unwrap();
-
-//         let wal = Arc::new(
-//             SecureWAL::<LogEntry, SequentialIvg, Aes256Ctr, KEY_SIZE>::open(
-//                 "/tmp/kms_test_secure_wal_reload.log",
-//                 key,
-//             )
-//             .unwrap(),
-//         );
-
-//         let expected: HashSet<_> = (0..4).map(|n| LogEntry { id: n }).collect();
-//         let actual: HashSet<_> = wal.iter_persisted(key).unwrap().collect();
-//         assert_eq!(expected, actual);
-//     }
-// }
