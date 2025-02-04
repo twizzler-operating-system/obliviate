@@ -231,6 +231,10 @@ impl<R, G, C, H, const N: usize> Khf<R, G, C, H, N> {
         self.roots.len() as u64
     }
 
+    pub fn roots(&self) -> &[Node<H, N>] {
+        &self.roots
+    }
+
     /// Returns `true` if the `Khf` is consolidated.
     pub fn is_consolidated(&self) -> bool {
         self.roots.len() == 1 && self.roots[0].pos == (0, 0)
