@@ -3,9 +3,12 @@ mod khf;
 // mod kht;
 // mod lethe;
 
+mod khf_tree;
 pub(self) mod node;
 pub(self) mod topology;
-mod khf_tree;
+
+pub use node::Node;
+pub use topology::Topology;
 
 pub use {
     error::{Error, Result},
